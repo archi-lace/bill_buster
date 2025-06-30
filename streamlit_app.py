@@ -18,6 +18,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 BILL_JSON = os.path.join(DATA_DIR, "aligned_sections.json")
 SUMMARY_JSON = os.path.join(DATA_DIR, "summaries.json")
+TITLE_SUMMARY = os.path.join(DATA_DIR, "title_summaries.json")
 
 @st.cache_data
 def load_bill_sections(path):
@@ -41,6 +42,16 @@ def load_summaries(path):
     }
 bill_sections = load_bill_sections(BILL_JSON)
 section_summaries = load_summaries(SUMMARY_JSON)
+
+@st.cache_data
+def load_title_summaries(path):
+    import os
+    if not os.path.exists(path):
+        return []
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+title_summaries = load_title_summaries(TITLE_SUMMARY)
 
 # ========= Load & clean all CSVs  (unchanged) ================
 @st.cache_data
@@ -146,15 +157,39 @@ st.set_page_config(layout="wide")
 st.title("FY26 Budget Explorer & Analytics")
 
 tabs = st.tabs([
+    "Bill Summaries (by Title)",
     "Bill Explorer",
     "Search Bill",
     "By Function/Subfunction (Historical)",
     "Historic vs Authorized Budget",
-    "By Agency (Historical)"
+    "By Agency (Historical)",
 ])
 
+# ========== Tab 1: Title Summaries ==========
+with tabs[0]:  
+    st.header("Synthesized Title Summaries")
+    if not title_summaries:
+        st.info("No title summaries available yet. Run the synthesis script first.")
+    else:
+        title_names = [t["title"] for t in title_summaries]
+        # Let user select a title to view
+        selected_title = st.selectbox("Select a Title", title_names)
+        selected_summary = next((t for t in title_summaries if t["title"] == selected_title), None)
+        if selected_summary:
+            st.subheader(selected_summary["title"])
+            st.markdown(f"**Number of sections:** {selected_summary.get('section_count', 'N/A')}")
+            st.markdown("### Synthesized Summary")
+            st.write(selected_summary.get("synthesized_summary", "_No synthesized summary available._"))
+            with st.expander("Show all section summaries under this Title"):
+                for s in selected_summary.get("section_summaries", []):
+                    st.markdown(f"**{s['section']}**")
+                    st.write(s['summary'])
+                    st.markdown("---")
+        else:
+            st.warning("Could not find data for the selected title.")
+
 # --- Bill Explorer: Hierarchical/Tree UI ---
-with tabs[0]:
+with tabs[1]:
     st.header("Bill Explorer")
     st.markdown("Browse and explore the full legislative text and AI summaries. Expand the hierarchy and click on any section to view its contents.")
 
@@ -243,7 +278,7 @@ with tabs[0]:
             st.info("No summary available for this section.")
 
 # --- Search Bill ---
-with tabs[1]:
+with tabs[2]:
     st.header("Search Bill Text & Summaries")
     query = st.text_input("Search by keyword (title, section, or text):")
     if query:
@@ -267,8 +302,8 @@ with tabs[1]:
             st.markdown("---")
     else:
         st.info("Enter a keyword above to search the bill.")
-# ========== Tab 3 : Historic Outlays (Function/Subfunction) ==========
-with tabs[2]:
+# ========== Tab 4 : Historic Outlays (Function/Subfunction) ==========
+with tabs[3]:
     st.header("Historic Outlays by Line Item by FY (in millions of dollars)")
     UNWANTED = hist_sf_df["Function"].str.contains(
         r"^\s*(Total|On-budget|Off-budget|\(On|\(Off)", regex=True
@@ -291,8 +326,8 @@ with tabs[2]:
     )
     st.line_chart(pivot1, use_container_width=True)
 
-# ========== Tab 4 : Historic vs Authorized Budget ==========
-with tabs[3]:
+# ========== Tab 5 : Historic vs Authorized Budget ==========
+with tabs[4]:
     st.header("Historic vs Authorized Budget")
     view = st.radio(
         "Granularity",
@@ -378,8 +413,8 @@ with tabs[3]:
         st.subheader("Authorized by function")
         st.bar_chart(auth_fn, use_container_width=True)
 
-# ========== Tab 5: By Agency (Historic) ==========
-with tabs[4]:
+# ========== Tab 6: By Agency (Historic) ==========
+with tabs[5]:
     st.header("Historic Outlays by Agency")
     agency_filt = filter_ui(agency_df, label_col="Agency", key_prefix="agency")
     st.subheader("Agency Outlay Table (in millions of dollars)")
@@ -393,4 +428,9 @@ with tabs[4]:
         )
     st.subheader(f"Top 10 Agencies (FY{target_year}, in millions of dollars)")
     st.bar_chart(top10, use_container_width=True)
+
+
+
+
+
 

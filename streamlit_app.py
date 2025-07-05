@@ -39,9 +39,9 @@ def load_summaries(path):
             s.get("section_summary", s.get("summary", "")) 
         for s in sections 
         if "section" in s
-    }
+    }, data.get("overall_analysis","")
 bill_sections = load_bill_sections(BILL_JSON)
-section_summaries = load_summaries(SUMMARY_JSON)
+section_summaries, overall_analysis = load_summaries(SUMMARY_JSON)
 
 @st.cache_data
 def load_title_summaries(path):
@@ -157,6 +157,7 @@ st.set_page_config(layout="wide")
 st.title("FY26 Budget Explorer & Analytics")
 
 tabs = st.tabs([
+    "Overall Bill Analysis",
     "Bill Summaries (by Title)",
     "Bill Explorer",
     "Search Bill",
@@ -165,8 +166,23 @@ tabs = st.tabs([
     "By Agency (Historical)",
 ])
 
+
+# ========== Tab 0: Overall Bill Analysis ==========
+with tabs[0]:
+    st.header("Overall Bill Analysis")
+    if not overall_analysis:
+        st.info("No overall analysis available yet. Run the summarizer script first.")
+    else:
+        st.markdown("### High-level Summary of the FY26 Bill")
+        # Expand/collapse for very long analysis
+        if len(overall_analysis) > 1200:
+            with st.expander("Show overall analysis"):
+                st.markdown(overall_analysis)
+        else:
+            st.markdown(overall_analysis)
+
 # ========== Tab 1: Title Summaries ==========
-with tabs[0]:  
+with tabs[1]:  
     st.header("Synthesized Title Summaries")
     if not title_summaries:
         st.info("No title summaries available yet. Run the synthesis script first.")
@@ -189,7 +205,7 @@ with tabs[0]:
             st.warning("Could not find data for the selected title.")
 
 # --- Bill Explorer: Hierarchical/Tree UI ---
-with tabs[1]:
+with tabs[2]:
     st.header("Bill Explorer")
     st.markdown("Browse and explore the full legislative text and AI summaries. Expand the hierarchy and click on any section to view its contents.")
 
@@ -278,7 +294,7 @@ with tabs[1]:
             st.info("No summary available for this section.")
 
 # --- Search Bill ---
-with tabs[2]:
+with tabs[3]:
     st.header("Search Bill Text & Summaries")
     query = st.text_input("Search by keyword (title, section, or text):")
     if query:
@@ -303,7 +319,7 @@ with tabs[2]:
     else:
         st.info("Enter a keyword above to search the bill.")
 # ========== Tab 4 : Historic Outlays (Function/Subfunction) ==========
-with tabs[3]:
+with tabs[4]:
     st.header("Historic Outlays by Line Item by FY (in millions of dollars)")
     UNWANTED = hist_sf_df["Function"].str.contains(
         r"^\s*(Total|On-budget|Off-budget|\(On|\(Off)", regex=True
@@ -327,7 +343,7 @@ with tabs[3]:
     st.line_chart(pivot1, use_container_width=True)
 
 # ========== Tab 5 : Historic vs Authorized Budget ==========
-with tabs[4]:
+with tabs[5]:
     st.header("Historic vs Authorized Budget")
     view = st.radio(
         "Granularity",
@@ -414,7 +430,7 @@ with tabs[4]:
         st.bar_chart(auth_fn, use_container_width=True)
 
 # ========== Tab 6: By Agency (Historic) ==========
-with tabs[5]:
+with tabs[6]:
     st.header("Historic Outlays by Agency")
     agency_filt = filter_ui(agency_df, label_col="Agency", key_prefix="agency")
     st.subheader("Agency Outlay Table (in millions of dollars)")
